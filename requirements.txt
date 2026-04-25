@@ -10,3 +10,4 @@ pillow
 google-generativeai
 circle-developer-controlled-wallets
 python-multipart
+mangum
