@@ -1,0 +1,9 @@
+[project]
+name = "python-agent-marketplace"
+version = "0.1.0"
+description = "AI agent marketplace with Gemini + Circle settlement demo"
+requires-python = ">=3.11"
+
+[project.scripts]
+app = "app.api.main:app"
+
