@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini Agent Marketplace Dashboard</title>
+  <style>
+    :root {
+      --bg: #070d18; --panel: #101a2f; --panel2: #152340; --text: #ecf3ff; --muted: #9eb0d0;
+      --line: #2a3b5e; --ok: #2dd4bf; --warn: #f59e0b; --bad: #fb7185; --chip: #173760;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, Segoe UI, Arial, sans-serif; background: radial-gradient(1000px 700px at 15% -10%, #1f3260 0%, var(--bg) 55%); color: var(--text); }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .header { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; margin-bottom: 14px; }
+    h1 { margin:0; font-size: 30px; }
+    .sub { margin: 6px 0 0; color: var(--muted); }
+    .pill { border:1px solid var(--line); background: var(--panel); border-radius:999px; padding:7px 12px; font-size:13px; font-weight:700; color:var(--muted); }
+    .pill.ok { color: var(--ok); border-color:#1f5d53; }
+
+    .hero { border:1px solid var(--line); background: linear-gradient(180deg,var(--panel),var(--panel2)); border-radius:12px; padding:10px 12px; color:#cfe3ff; font-size:13px; margin-bottom:14px; }
+    .banner { border:1px solid #6b2c35; background:#2a1116; color:#ffb4c0; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:13px; display:none; }
+    .grid { display:grid; gap:12px; }
+    .kpis { grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); }
+    .card { border:1px solid var(--line); background: linear-gradient(180deg,var(--panel),var(--panel2)); border-radius:12px; padding:12px; }
+    .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+    .value { font-size:26px; font-weight:700; margin:0; }
+    .layout { grid-template-columns: 360px 1fr 1fr; align-items:start; }
+    @media (max-width: 1200px) { .layout { grid-template-columns:1fr; } }
+
+    .title2 { margin:0 0 10px; font-size:15px; }
+    .row { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+    label { font-size:13px; color:var(--muted); }
+    textarea,input,button,select { width:100%; border-radius:9px; border:1px solid var(--line); background:#0d1629; color:var(--text); padding:9px 10px; font-size:14px; font-family:inherit; }
+    textarea { min-height:84px; resize:vertical; }
+    .btn { cursor:pointer; font-weight:700; background:linear-gradient(90deg,#2563eb,#4f46e5); }
+    .btn.ghost { background:#12233f; }
+    .btn.warn { background: linear-gradient(90deg,#c47a00,#ab4600); }
+    .btn:disabled { opacity:.65; cursor:not-allowed; }
+    .hint { color:var(--muted); font-size:12px; margin: 8px 0 0; }
+    .wallets { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:8px; }
+    .wallet { border:1px solid var(--line); background:#0c1629; border-radius:10px; padding:9px; }
+    .wallet .n { color:var(--muted); font-size:12px; margin-bottom:4px; }
+    .wallet .b { font-weight:700; }
+    .goal { font-size:12px; margin-top:8px; color:var(--muted); }
+    .goal strong { color: var(--warn); }
+
+    .list { max-height: 360px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+    .item { border:1px solid var(--line); background:#0c1629; border-radius:10px; padding:9px; }
+    .item .top { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+    .chip { border:1px solid #2b5688; background:var(--chip); border-radius:999px; padding:3px 7px; font-size:11px; font-weight:700; color:#a9ccff; }
+    .amt { color:var(--ok); font-weight:700; font-size:13px; }
+    .meta { font-size:12px; color:var(--muted); line-height:1.45; word-break:break-word; }
+    .bad { color:var(--bad); }
+    .ok { color:var(--ok); }
+    .trace { max-height: 280px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+    code { color:#b4d3ff; }
+    .inline { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <h1>Gemini Agent Marketplace</h1>
+        <p class="sub">Gemini function-calling agents + Circle/Arc settlement + Supabase audit trail</p>
+      </div>
+      <div id="wsStatus" class="pill">WebSocket: Connecting</div>
+    </div>
+
+    <div id="hero" class="hero">Loading hero metrics...</div>
+    <div id="quotaBanner" class="banner"></div>
+
+    <div class="grid kpis">
+      <div class="card"><div class="label">Transactions</div><p id="kTx" class="value">0</p></div>
+      <div class="card"><div class="label">Total USDC Settled</div><p id="kUsdc" class="value">0.000000</p></div>
+      <div class="card"><div class="label">Estimated ETH Cost</div><p id="kEth" class="value">$0.00</p></div>
+      <div class="card"><div class="label">Estimated Savings</div><p id="kSave" class="value">$0.00</p></div>
+    </div>
+
+    <div class="grid layout" style="margin-top:12px;">
+      <section class="card">
+        <h2 class="title2">Run Workflow</h2>
+        <div class="row"><label for="prompt">Prompt</label><textarea id="prompt">Research and draft a market brief for USDC micropayment SaaS pricing.</textarea></div>
+        <div class="row"><label for="rounds">Rounds</label><input id="rounds" type="number" min="1" max="500" value="10"/></div>
+        <div class="inline">
+          <label><input id="useNeg" type="checkbox" checked/> Use negotiation</label>
+          <label><input id="useGrounding" type="checkbox"/> Use grounding</label>
+          <label><input id="humanApproved" type="checkbox"/> Human-approved high payments</label>
+          <label><input id="forceStub" type="checkbox"/> Force stub planning</label>
+        </div>
+        <div style="margin-top:8px;" class="inline">
+          <button id="runBtn" class="btn">Run Agent Cycles</button>
+          <button id="drainBtn" class="btn warn">Simulate low balance</button>
+        </div>
+        <p class="hint">`/run-cycle` supports policy + negotiation flags so you can demo safety gates live.</p>
+
+        <h2 class="title2" style="margin-top:14px;">Wallet Balances</h2>
+        <div id="wallets" class="wallets"></div>
+        <div class="goal">Target check: <strong id="goal">Not reached</strong> (50+ transactions)</div>
+
+        <h2 class="title2" style="margin-top:14px;">Invoice / Receipt (Multimodal)</h2>
+        <div class="row"><input id="invoiceFile" type="file" accept="image/*"/></div>
+        <button id="invoiceBtn" class="btn ghost">Analyze invoice with Gemini</button>
+        <div id="invoiceOut" class="meta" style="margin-top:8px;"></div>
+
+        <h2 class="title2" style="margin-top:14px;">Audit exports</h2>
+        <div class="inline">
+          <button id="csvBtn" class="btn ghost">Download CSV</button>
+          <button id="pdfBtn" class="btn ghost">Download PDF</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="title2">Live Payment Feed</h2>
+        <div id="txList" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="title2">Gemini Tool Trace & Policy Events</h2>
+        <div id="traceList" class="trace"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const wsStatus = $("wsStatus");
+    const txList = $("txList");
+    const traceList = $("traceList");
+    const quotaBanner = $("quotaBanner");
+    let explorerTemplate = null;
+    let geminiUnavailable = false;
+
+    const fmt = (v) => Number(v || 0).toFixed(6);
+    const short = (s) => !s ? "-" : (s.length < 18 ? s : s.slice(0,10) + "..." + s.slice(-6));
+
+    function txLink(txHash) {
+      if (!explorerTemplate || !txHash) return short(txHash);
+      const clean = String(txHash).replace("0xCircleTx:", "");
+      const href = explorerTemplate.replace("{tx_hash}", encodeURIComponent(clean));
+      return `<a href="${href}" target="_blank" rel="noreferrer" style="color:#8dc3ff">${short(txHash)}</a>`;
+    }
+
+    function addTx(row) {
+      const el = document.createElement("article");
+      el.className = "item";
+      el.innerHTML = `
+        <div class="top">
+          <span class="chip">${row.sender_wallet} -> ${row.recipient_wallet}</span>
+          <span class="amt">${fmt(row.amount_usdc)} USDC</span>
+        </div>
+        <div class="meta">
+          <div><strong>Task:</strong> ${row.task_description || "-"}</div>
+          <div><strong>Tx:</strong> ${txLink(row.arc_tx_hash)}</div>
+          <div><strong>Time:</strong> ${new Date(row.timestamp).toLocaleString()}</div>
+        </div>`;
+      txList.prepend(el);
+      while (txList.children.length > 150) txList.removeChild(txList.lastChild);
+    }
+
+    function addTrace(title, body, cls="") {
+      const el = document.createElement("article");
+      el.className = "item";
+      el.innerHTML = `<div class="top"><span class="chip">${title}</span></div><div class="meta ${cls}"><pre style="margin:0;white-space:pre-wrap;font-family:inherit;">${body}</pre></div>`;
+      traceList.prepend(el);
+      while (traceList.children.length > 120) traceList.removeChild(traceList.lastChild);
+    }
+
+    function setGeminiUnavailable(reason) {
+      geminiUnavailable = true;
+      quotaBanner.style.display = "block";
+      quotaBanner.textContent = "Gemini unavailable (quota/rate limit). Automatically switched to demo-safe mode: stub planning ON, negotiation OFF, grounding OFF. Reason: " + reason;
+      $("forceStub").checked = true;
+      $("useNeg").checked = false;
+      $("useGrounding").checked = false;
+      $("invoiceBtn").disabled = true;
+      $("invoiceBtn").textContent = "Invoice analyze disabled (Gemini quota)";
+    }
+
+    function checkQuotaAndHandle(message) {
+      const text = String(message || "").toLowerCase();
+      if (text.includes("429") || text.includes("quota") || text.includes("rate limit")) {
+        setGeminiUnavailable(String(message || "quota/rate limit"));
+        return true;
+      }
+      return false;
+    }
+
+    async function refreshMetrics() {
+      const [mr, br] = await Promise.all([fetch("/metrics"), fetch("/balances")]);
+      if (!mr.ok || !br.ok) {
+        const mtxt = await mr.text();
+        const btxt = await br.text();
+        throw new Error(`refresh failed /metrics=${mr.status} /balances=${br.status} ${mtxt || btxt}`);
+      }
+      const [m, b] = await Promise.all([parseJsonSafely(mr), parseJsonSafely(br)]);
+      $("kTx").textContent = m.transaction_count;
+      $("kUsdc").textContent = fmt(m.total_usdc_settled);
+      $("kEth").textContent = "$" + Number(m.estimated_eth_mainnet_cost || 0).toFixed(2);
+      $("kSave").textContent = "$" + Number(m.estimated_savings_vs_eth || 0).toFixed(2);
+      $("goal").textContent = m.target_reached_50_transactions ? "Reached" : "Not reached";
+      $("hero").textContent = m.hero_summary || "No hero summary yet.";
+      explorerTemplate = m.arc_explorer_tx_url_template || null;
+      $("wallets").innerHTML = Object.entries(b).map(([k,v]) => `<div class="wallet"><div class="n">${k}</div><div class="b">${fmt(v)} USDC</div></div>`).join("");
+    }
+
+    async function loadRecent() {
+      const res = await fetch("/recent-transactions?limit=45");
+      const data = await parseJsonSafely(res);
+      if (!res.ok) throw new Error(data.detail || "recent-transactions failed");
+      txList.innerHTML = "";
+      for (const row of data.items) addTx(row);
+    }
+
+    async function parseJsonSafely(res) {
+      const txt = await res.text();
+      try { return JSON.parse(txt); } catch { return { detail: txt || `HTTP ${res.status}` }; }
+    }
+
+    async function runCycles() {
+      const prompt = $("prompt").value.trim();
+      const rounds = Number($("rounds").value);
+      if (!prompt) return alert("Prompt required.");
+      if (Number.isNaN(rounds) || rounds < 1 || rounds > 500) return alert("Rounds must be 1..500");
+      const btn = $("runBtn");
+      btn.disabled = true; btn.textContent = "Running...";
+      try {
+        const body = {
+          prompt, rounds,
+          human_approved: $("humanApproved").checked,
+          use_negotiation: $("useNeg").checked,
+          use_grounding: $("useGrounding").checked,
+          force_stub_planning: $("forceStub").checked,
+        };
+        const res = await fetch("/run-cycle", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+        const out = await parseJsonSafely(res);
+        if (!res.ok) throw new Error(out.detail || "run-cycle failed");
+        addTrace("cycle_complete", JSON.stringify(out.results?.[out.results.length - 1] || out, null, 2), "ok");
+        await refreshMetrics();
+      } catch (e) {
+        addTrace("run_error", String(e), "bad");
+        checkQuotaAndHandle(String(e));
+        alert("Run failed: " + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = "Run Agent Cycles";
+      }
+    }
+
+    async function drainBalance() {
+      const res = await fetch("/demo/coordinator-balance", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ balance_usdc: 0.001 })});
+      const out = await parseJsonSafely(res);
+      addTrace("demo_balance", JSON.stringify(out, null, 2));
+      await refreshMetrics();
+    }
+
+    async function analyzeInvoice() {
+      const f = $("invoiceFile").files?.[0];
+      if (!f) return alert("Choose an image file first.");
+      const fd = new FormData();
+      fd.append("file", f);
+      const btn = $("invoiceBtn");
+      btn.disabled = true; btn.textContent = "Analyzing...";
+      try {
+        const res = await fetch("/invoice/analyze", { method:"POST", body: fd });
+        const out = await parseJsonSafely(res);
+        if (!res.ok) throw new Error(out.detail || "invoice analyze failed");
+        $("invoiceOut").innerHTML = `Vendor: <b>${out.vendor || "-"}</b><br/>Amount: <b>${out.amount_usdc ?? "-"}</b> USDC<br/>Summary: ${out.summary || "-"}`;
+        addTrace("invoice_analysis", JSON.stringify(out, null, 2), "ok");
+      } catch (e) {
+        $("invoiceOut").textContent = "Error: " + e.message;
+        addTrace("invoice_error", String(e), "bad");
+        checkQuotaAndHandle(String(e));
+      } finally {
+        if (!geminiUnavailable) {
+          btn.disabled = false;
+          btn.textContent = "Analyze invoice with Gemini";
+        }
+      }
+    }
+
+    function download(url) { window.open(url, "_blank"); }
+
+    function connectWS() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${proto}//${location.host}/ws/events`);
+      ws.addEventListener("open", () => { wsStatus.textContent = "WebSocket: Connected"; wsStatus.classList.add("ok"); });
+      ws.addEventListener("message", async (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "transaction") addTx(msg.payload || msg);
+        else if (msg.type === "gemini_tool") addTrace("gemini_tool", JSON.stringify(msg.payload, null, 2), "ok");
+        else if (["policy_block","payment_error","db_error","negotiation_error"].includes(msg.type)) addTrace(msg.type, JSON.stringify(msg.payload, null, 2), "bad");
+        else if (msg.type === "negotiation_disabled") {
+          addTrace("negotiation_disabled", JSON.stringify(msg.payload, null, 2), "bad");
+          setGeminiUnavailable((msg.payload && msg.payload.reason) || "quota/rate limit");
+        }
+        else if (["negotiation","gemini_session","stub_plan","cycle_complete"].includes(msg.type)) addTrace(msg.type, JSON.stringify(msg.payload, null, 2));
+        if (msg.type === "negotiation_error") {
+          const m = msg.payload && msg.payload.message ? msg.payload.message : "";
+          checkQuotaAndHandle(m);
+        }
+        await refreshMetrics();
+      });
+      ws.addEventListener("close", () => { wsStatus.textContent = "WebSocket: Reconnecting..."; wsStatus.classList.remove("ok"); setTimeout(connectWS, 1200); });
+    }
+
+    $("runBtn").addEventListener("click", runCycles);
+    $("drainBtn").addEventListener("click", drainBalance);
+    $("invoiceBtn").addEventListener("click", analyzeInvoice);
+    $("csvBtn").addEventListener("click", () => download("/export/transactions.csv"));
+    $("pdfBtn").addEventListener("click", () => download("/export/transactions.pdf"));
+
+    (async function init() {
+      try {
+        await Promise.all([refreshMetrics(), loadRecent()]);
+      } catch (e) {
+        addTrace("init_error", String(e), "bad");
+      }
+      connectWS();
+      setInterval(async () => {
+        try {
+          await refreshMetrics();
+        } catch (e) {
+          addTrace("metrics_error", String(e), "bad");
+        }
+      }, 6000);
+    })();
+  </script>
+</body>
+</html>

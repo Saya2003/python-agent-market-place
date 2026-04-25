@@ -1,0 +1,34 @@
+# Python cache / build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets*.json
+credentials*.json
+
+# Local logs / exports that may contain sensitive data
+logs/
+*.log
+*.csv
+*.pdf
+
+# Known local helper script with hardcoded credentials
+encrypt_secret.py
